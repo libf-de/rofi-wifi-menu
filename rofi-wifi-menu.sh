@@ -9,7 +9,7 @@ FIELDS=SSID,SECURITY
 POSITION=0
 YOFF=0
 XOFF=0
-FONT="DejaVu Sans Mono 8"
+FONT="DejaVu Sans Mono 12"
 
 if [ -r "$DIR/config" ]; then
 	source "$DIR/config"
@@ -21,13 +21,19 @@ fi
 
 LIST=$(nmcli --fields "$FIELDS" device wifi list | sed '/^--/d')
 # For some reason rofi always approximates character width 2 short... hmmm
-RWIDTH=$(($(echo "$LIST" | head -n 1 | awk '{print length($0); }')+2))
+WIDTH=$(echo "$LIST" | head -n 1 | awk '{print length($0); }')
+RWIDTH=$((${WIDTH}*11))
+
+# Separator
+SEPARATOR=$(printf '━%.0s' $(seq 1 ${WIDTH}))
+
+#RWIDTH=10
 # Dynamically change the height of the rofi menu
 LINENUM=$(echo "$LIST" | wc -l)
 # Gives a list of known connections so we can parse it later
 KNOWNCON=$(nmcli connection show)
 # Really janky way of telling if there is currently a connection
-CONSTATE=$(nmcli -fields WIFI g)
+CONSTATE=$(LANG=C nmcli -fields WIFI g)
 
 CURRSSID=$(LANGUAGE=C nmcli -t -f active,ssid dev wifi | awk -F: '$1 ~ /^yes/ {print $2}')
 
@@ -50,9 +56,9 @@ elif [[ "$CONSTATE" =~ "disabled" ]]; then
 	TOGGLE="toggle on"
 fi
 
+LIST="${LIST/$'\n'/$'\\x0nonselectable\\x1ftrue\n'}"
 
-
-CHENTRY=$(echo -e "$TOGGLE\nmanual\n$LIST" | uniq -u | rofi -dmenu -p "Wi-Fi SSID: " -lines "$LINENUM" -a "$HIGHLINE" -location "$POSITION" -yoffset "$YOFF" -xoffset "$XOFF" -font "$FONT" -width -"$RWIDTH")
+CHENTRY=$(echo -e "$TOGGLE\n$SEPARATOR\0nonselectable\x1ftrue\n$LIST\n$SEPARATOR\0nonselectable\x1ftrue\nmanual" | uniq -u | rofi -dmenu -p "Wi-Fi SSID: " -lines "$LINENUM" -a "$HIGHLINE" -location "$POSITION" -yoffset "$YOFF" -xoffset "$XOFF" -theme-str "window { width: ${RWIDTH}; } configuration { show-icons: false; }")
 #echo "$CHENTRY"
 CHSSID=$(echo "$CHENTRY" | sed  's/\s\{2,\}/\|/g' | awk -F "|" '{print $1}')
 #echo "$CHSSID"
